@@ -8,7 +8,10 @@ import { IoClose } from "react-icons/io5";
 import { useGlobalContext } from '../provider/GlobalProvider'
 
 const EditAddressDetails = ({close, data}) => {
-    const { register, handleSubmit,reset } = useForm({
+    const initialCountryCode = data.mobile?.includes(' ') ? data.mobile.split(' ')[0] : '+91'
+    const initialMobile = data.mobile?.includes(' ') ? data.mobile.split(' ')[1] : data.mobile
+
+    const { register, handleSubmit, reset, watch, setValue } = useForm({
         defaultValues : {
             _id : data._id,
             userId : data.userId,
@@ -17,10 +20,34 @@ const EditAddressDetails = ({close, data}) => {
             state : data.state,
             country : data.country,
             pincode : data.pincode,
-            mobile : data.mobile 
+            mobile : initialMobile 
         }
     })
     const { fetchAddress } = useGlobalContext()
+    const [countryCode, setCountryCode] = React.useState(initialCountryCode)
+
+    const pincode = watch("pincode")
+
+    React.useEffect(() => {
+        if (pincode && pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+            const fetchCityState = async () => {
+                try {
+                    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+                    const result = await res.json();
+                    if (result && result[0] && result[0].Status === 'Success') {
+                        const details = result[0].PostOffice[0];
+                        setValue("city", details.District);
+                        setValue("state", details.State);
+                        setValue("country", "India");
+                        toast.success("City and State auto-filled!");
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch pincode details", error);
+                }
+            };
+            fetchCityState();
+        }
+    }, [pincode, setValue]);
 
     const onSubmit = async(data)=>{
         try {
@@ -32,8 +59,9 @@ const EditAddressDetails = ({close, data}) => {
                     city : data.city,
                     state : data.state,
                     country : data.country,
+                    country : data.country,
                     pincode : data.pincode,
-                    mobile : data.mobile
+                    mobile : `${countryCode} ${data.mobile}`
                 }
             })
 
@@ -108,12 +136,25 @@ const EditAddressDetails = ({close, data}) => {
                 </div>
                 <div className='grid gap-1'>
                     <label htmlFor='mobile'>Mobile No. :</label>
-                    <input
-                        type='text'
-                        id='mobile' 
-                        className='border bg-blue-50 p-2 rounded'
-                        {...register("mobile",{required : true})}
-                    />
+                    <div className='flex gap-2'>
+                        <select 
+                            value={countryCode} 
+                            onChange={(e) => setCountryCode(e.target.value)}
+                            className='border bg-blue-50 p-2 rounded w-28 outline-none'
+                        >
+                            <option value="+91">+91 (IN)</option>
+                            <option value="+1">+1 (US)</option>
+                            <option value="+44">+44 (UK)</option>
+                            <option value="+61">+61 (AU)</option>
+                            <option value="+971">+971 (UAE)</option>
+                        </select>
+                        <input
+                            type='text'
+                            id='mobile' 
+                            className='border bg-blue-50 p-2 rounded flex-1'
+                            {...register("mobile",{required : true})}
+                        />
+                    </div>
                 </div>
 
                 <button type='submit' className='bg-primary-200 w-full  py-2 font-semibold mt-4 hover:bg-primary-100'>Submit</button>

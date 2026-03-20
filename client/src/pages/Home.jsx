@@ -4,6 +4,7 @@ import { valideURLConvert } from '../utils/valideURLConvert'
 import { useNavigate } from 'react-router-dom'
 import CategoryWiseProductDisplay from '../components/CategoryWiseProductDisplay'
 import { BsCart4 } from "react-icons/bs";
+import Iridescence from '../components/Iridescence';
 
 const Home = () => {
   const loadingCategory = useSelector(state => state.product.loadingCategory)
@@ -22,12 +23,14 @@ const Home = () => {
   return (
     <section className='bg-slate-50 min-h-screen'>
       {/* Hero Section */}
-      <div className='gradient-bg pb-24 lg:pb-32 pt-16 lg:pt-24 min-h-[500px] flex items-center relative'>
-        <div className='absolute inset-0 overflow-hidden pointer-events-none opacity-20'>
-           {/* Decorative elements behind hero */}
-           <div className='absolute -top-20 -right-20 w-96 h-96 bg-emerald-500 rounded-full mix-blend-screen filter blur-[100px] animate-pulse' style={{ animationDuration: '8s' }}></div>
-           <div className='absolute -bottom-32 -left-20 w-[30rem] h-[30rem] bg-indigo-500 rounded-full mix-blend-screen filter blur-[120px]'></div>
-        </div>
+      <div className='pb-24 lg:pb-32 pt-16 lg:pt-24 min-h-[500px] flex items-center relative overflow-hidden'>
+        {/* Decorative Iridescence background */}
+        <Iridescence
+          color={[0.5,0.6,0.8]}
+          mouseReact
+          amplitude={0.1}
+          speed={1}
+        />
         
         <div className='container mx-auto px-4 relative z-10'>
           <div className='text-center text-white max-w-4xl mx-auto'>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { IoClose } from 'react-icons/io5'
+import { BsCart4 } from "react-icons/bs"
 import { Link, useNavigate } from 'react-router-dom'
 import { useGlobalContext } from '../provider/GlobalProvider'
 import { DisplayPriceInRupees } from '../utils/DisplayPriceInRupees'

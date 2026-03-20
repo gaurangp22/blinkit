@@ -18,6 +18,7 @@ const CheckoutPage = () => {
   const [step, setStep] = useState(location?.state?.step || 1)
   const [loading, setLoading] = useState(false)
   const [addressErrors, setAddressErrors] = useState({})
+  const [countryCode, setCountryCode] = useState('+91')
   const [address, setAddress] = useState({
     name: '',
     mobile: '',
@@ -32,11 +33,39 @@ const CheckoutPage = () => {
     if (addressErrors[e.target.name]) setAddressErrors(prev => ({ ...prev, [e.target.name]: "" }))
   }
 
+  const handlePincodeChange = async (e) => {
+    const value = e.target.value;
+    setAddress(prev => ({ ...prev, pincode: value }));
+    if (addressErrors.pincode) setAddressErrors(prev => ({ ...prev, pincode: "" }));
+
+    if (value.length === 6 && /^\d{6}$/.test(value)) {
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${value}`);
+        const data = await res.json();
+        
+        if (data && data[0] && data[0].Status === 'Success') {
+          const details = data[0].PostOffice[0];
+          setAddress(prev => ({ 
+            ...prev, 
+            city: details.District, 
+            state: details.State 
+          }));
+          setAddressErrors(prev => ({ ...prev, city: "", state: "" }));
+          toast.success("City and State auto-filled!");
+        } else {
+          setAddressErrors(prev => ({ ...prev, pincode: "Invalid Pincode" }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch pincode details", error);
+      }
+    }
+  }
+
   const validateAddress = () => {
     const err = {}
     if (!address.name.trim() || address.name.trim().length < 2) err.name = "Full name is required"
-    const cleanMobile = address.mobile.replace(/[\s\-\+]/g, '').replace(/^91/, '')
-    if (!cleanMobile || !/^\d{10}$/.test(cleanMobile)) err.mobile = "Enter a valid 10-digit phone number"
+    const cleanMobile = address.mobile.replace(/[\s\-\+]/g, '')
+    if (!cleanMobile || cleanMobile.length < 8 || cleanMobile.length > 15) err.mobile = "Enter a valid phone number"
     if (!address.address_line.trim()) err.address_line = "Address is required"
     if (!address.city.trim()) err.city = "City is required"
     if (!address.state.trim()) err.state = "State is required"
@@ -54,7 +83,7 @@ const CheckoutPage = () => {
         ...SummaryApi.CashOnDeliveryOrder,
         data: {
           list_items: cartItemsList,
-          delivery_address: address,
+          delivery_address: { ...address, mobile: `${countryCode} ${address.mobile}` },
           subTotalAmt: totalPrice,
           totalAmt: totalPrice,
         }
@@ -183,9 +212,22 @@ const CheckoutPage = () => {
                 </div>
                 <div>
                   <label className='text-sm font-medium text-slate-700 mb-1 block'>Phone Number *</label>
-                  <input name='mobile' value={address.mobile} onChange={handleAddressChange}
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-sm transition-all ${addressErrors.mobile ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`}
-                    placeholder='+91 9876543210' />
+                  <div className="flex gap-2">
+                    <select 
+                      value={countryCode} 
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      className="w-24 px-2 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-medium text-slate-700"
+                    >
+                      <option value="+91">+91 (IN)</option>
+                      <option value="+1">+1 (US)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+61">+61 (AU)</option>
+                      <option value="+971">+971 (UAE)</option>
+                    </select>
+                    <input name='mobile' value={address.mobile} onChange={handleAddressChange}
+                      className={`flex-1 px-4 py-2.5 border rounded-xl outline-none text-sm transition-all sm:text-base ${addressErrors.mobile ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`}
+                      placeholder='9876543210' />
+                  </div>
                   {addressErrors.mobile && <p className='text-xs text-red-500 mt-1'>{addressErrors.mobile}</p>}
                 </div>
               </div>
@@ -213,9 +255,9 @@ const CheckoutPage = () => {
                 </div>
                 <div>
                   <label className='text-sm font-medium text-slate-700 mb-1 block'>Pincode *</label>
-                  <input name='pincode' value={address.pincode} onChange={handleAddressChange}
+                  <input name='pincode' value={address.pincode} onChange={handlePincodeChange}
                     className={`w-full px-4 py-2.5 border rounded-xl outline-none text-sm transition-all ${addressErrors.pincode ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`}
-                    placeholder='110001' />
+                    placeholder='110001 (Auto-fills City/State)' maxLength={6} />
                   {addressErrors.pincode && <p className='text-xs text-red-500 mt-1'>{addressErrors.pincode}</p>}
                 </div>
               </div>
