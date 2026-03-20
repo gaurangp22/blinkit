@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+html{
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body{
+    font-family: "Inter", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    @apply bg-slate-50 text-slate-800 tracking-tight;
+}
+
+.scrollbar-none::-webkit-scrollbar{
+    display: none;
+}
+
+.scrollbarCustom::-webkit-scrollbar{
+    width: 6px;
+    height: 6px;
+    @apply bg-transparent;
+}
+.scrollbarCustom::-webkit-scrollbar-thumb{
+    @apply bg-slate-300 rounded-full hover:bg-slate-400 object-contain;
+}
+
+.gradient-bg {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.gradient-bg::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at top right, rgba(16, 185, 129, 0.15), transparent 50%),
+                radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.15), transparent 50%);
+    pointer-events: none;
+}
+
+.card-hover {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.card-hover:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px -8px rgba(0,0,0,0.12);
+}
+
+.glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.btn-premium {
+    @apply relative overflow-hidden transition-all duration-300 ease-out;
+}
+.btn-premium::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.5s ease-out;
+}
+.btn-premium:hover::after {
+    left: 150%;
+}

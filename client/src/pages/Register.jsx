@@ -1,0 +1,114 @@
+import React, { useState } from 'react'
+import { FaRegEyeSlash, FaRegEye } from "react-icons/fa6";
+import { BsCart4 } from "react-icons/bs";
+import toast from 'react-hot-toast';
+import Axios from '../utils/Axios';
+import SummaryApi from '../common/SummaryApi';
+import AxiosToastError from '../utils/AxiosToastError';
+import { Link, useNavigate } from 'react-router-dom';
+
+const InputField = ({ label, id, type = "text", placeholder, value, onChange, error, showToggle, isVisible, onToggle }) => (
+    <div className='grid gap-2'>
+        <label htmlFor={id} className='text-sm font-semibold text-slate-700 ml-1'>{label}</label>
+        <div className={`bg-slate-50 border rounded-xl flex items-center transition-all ${error ? 'border-red-400 ring-2 ring-red-100 bg-red-50/50' : 'border-slate-200 focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white'}`}>
+            <input
+                type={showToggle ? (isVisible ? "text" : "password") : type}
+                id={id} name={id}
+                className='w-full px-5 py-3.5 bg-transparent outline-none rounded-xl text-sm font-medium'
+                value={value} onChange={onChange} placeholder={placeholder}
+            />
+            {showToggle && (
+                <button type='button' onClick={onToggle} className='px-4 text-slate-400 hover:text-slate-600 transition-colors'>
+                    {isVisible ? <FaRegEye size={18} /> : <FaRegEyeSlash size={18} />}
+                </button>
+            )}
+        </div>
+        {error && <p className='text-xs font-semibold text-red-500 ml-1'>{error}</p>}
+    </div>
+)
+
+const Register = () => {
+    const [data, setData] = useState({ name: "", email: "", mobile: "", password: "", confirmPassword: "" })
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+    const [errors, setErrors] = useState({})
+    const navigate = useNavigate()
+
+    const handleChange = (e) => {
+        const { name, value } = e.target
+        setData(prev => ({ ...prev, [name]: value }))
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }))
+    }
+
+    const validate = () => {
+        const err = {}
+        if (!data.name.trim() || data.name.trim().length < 2) err.name = "Name must be at least 2 characters"
+        if (!data.email.trim()) err.email = "Email is required"
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) err.email = "Enter a valid email"
+        if (data.mobile && !/^\+?[\d\s\-]{10,13}$/.test(data.mobile)) err.mobile = "Enter a valid 10-digit phone number"
+        if (!data.password) err.password = "Password is required"
+        else if (data.password.length < 6) err.password = "At least 6 characters"
+        else if (!/[a-zA-Z]/.test(data.password)) err.password = "Must contain a letter"
+        else if (!/[0-9]/.test(data.password)) err.password = "Must contain a number"
+        if (data.password !== data.confirmPassword) err.confirmPassword = "Passwords don't match"
+        setErrors(err)
+        return Object.keys(err).length === 0
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        if (!validate()) return
+        try {
+            const response = await Axios({ ...SummaryApi.register, data: data })
+            if (response.data.error) toast.error(response.data.message)
+            if (response.data.success) {
+                toast.success(response.data.message)
+                setData({ name: "", email: "", mobile: "", password: "", confirmPassword: "" })
+                navigate("/login")
+            }
+        } catch (error) {
+            AxiosToastError(error)
+        }
+    }
+
+    return (
+        <section className='min-h-[85vh] flex items-center justify-center bg-slate-50 relative overflow-hidden px-4 py-8'>
+            {/* Soft decorative background blurs */}
+            <div className='absolute top-0 right-0 w-96 h-96 bg-teal-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 pointer-events-none'></div>
+            <div className='absolute bottom-0 left-0 w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 pointer-events-none'></div>
+
+            <div className='bg-white/90 backdrop-blur-xl w-full max-w-[28rem] rounded-[2rem] shadow-premium border border-white p-8 sm:p-10 relative z-10'>
+                <div className='text-center mb-8'>
+                    <div className='flex justify-center mb-4'>
+                        <div className='w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform'>
+                            <BsCart4 size={28} className='text-emerald-400' />
+                        </div>
+                    </div>
+                    <h1 className='text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight'>Create Account</h1>
+                    <p className='text-slate-500 font-medium text-sm mt-2'>Join Cartify for the fastest grocery delivery.</p>
+                </div>
+
+                <form className='grid gap-5' onSubmit={handleSubmit}>
+                    <InputField label="Full Name" id="name" placeholder="E.g. Jane Doe" value={data.name} onChange={handleChange} error={errors.name} />
+                    <InputField label="Email Address" id="email" type="email" placeholder="name@company.com" value={data.email} onChange={handleChange} error={errors.email} />
+                    <InputField label="Mobile Number" id="mobile" type="tel" placeholder="+1 (555) 000-0000" value={data.mobile} onChange={handleChange} error={errors.mobile} />
+                    <InputField label="Password" id="password" placeholder="Min 6 characters" value={data.password} onChange={handleChange} error={errors.password} showToggle isVisible={showPassword} onToggle={() => setShowPassword(p => !p)} />
+                    <InputField label="Confirm Password" id="confirmPassword" placeholder="Repeat your password" value={data.confirmPassword} onChange={handleChange} error={errors.confirmPassword} showToggle isVisible={showConfirmPassword} onToggle={() => setShowConfirmPassword(p => !p)} />
+
+                    <button
+                        className='btn-premium w-full mt-4 py-4 rounded-xl font-bold text-base transition-all bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0'
+                    >
+                        Create Account
+                    </button>
+                </form>
+
+                <p className='text-center mt-8 text-sm font-medium text-slate-500'>
+                    Already have an account?{' '}
+                    <Link to="/login" className='font-bold text-slate-900 hover:text-emerald-600 transition-colors'>Sign in</Link>
+                </p>
+            </div>
+        </section>
+    )
+}
+
+export default Register
