@@ -152,6 +152,18 @@ const SummaryApi = {
     getOrderItems : {
         url : '/api/order/order-list',
         method : 'get'
+    },
+    cancelOrder : {
+        url : '/api/order/cancel',
+        method : 'put'
+    },
+    reorderItem : {
+        url : '/api/order/reorder',
+        method : 'post'
+    },
+    trackOrder : {
+        url : '/api/order/track',
+        method : 'post'
     }
 }
 

@@ -206,6 +206,9 @@ class Order(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False)
     product_details = db.Column(db.JSON)
     payment_status = db.Column(db.String(50), default="CASH ON DELIVERY")
+    order_status = db.Column(db.String(50), default="Processing")
+    quantity = db.Column(db.Integer, default=1)
+    invoice_number = db.Column(db.String(100), default="")
     delivery_address = db.Column(db.JSON, default=dict)
     sub_total_amt = db.Column(db.Float, default=0)
     total_amt = db.Column(db.Float, default=0)
@@ -222,6 +225,9 @@ class Order(db.Model):
             "productId": self.product_id,
             "product_details": self.product_details or {},
             "payment_status": self.payment_status or "",
+            "order_status": self.order_status or "Processing",
+            "quantity": self.quantity or 1,
+            "invoice_number": self.invoice_number or "",
             "delivery_address": self.delivery_address or {},
             "subTotalAmt": self.sub_total_amt,
             "totalAmt": self.total_amt,

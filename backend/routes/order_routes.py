@@ -1,6 +1,6 @@
 import uuid
 from flask import Blueprint, request, jsonify
-from models import db, Order, CartProduct, Product
+from models import db, Order, CartProduct, Product, Address
 from auth_middleware import auth_required
 
 order_bp = Blueprint("order", __name__, url_prefix="/api/order")
@@ -38,9 +38,8 @@ def place_order():
         mobile = re.sub(r'[\s\-\+]', '', address_data.get("mobile", ""))
         if mobile.startswith('91') and len(mobile) == 12:
             mobile = mobile[2:]
-        if not re.match(r'^\d{10}$', mobile):
-            return jsonify({"message": "Phone number must be 10 digits", "error": True, "success": False}), 400
 
+        invoice_num = f"INV-{uuid.uuid4().hex[:10].upper()}"
         order_records = []
         for item in list_items:
             product_data = item.get("productId", {})
@@ -49,12 +48,16 @@ def place_order():
             if not product:
                 continue
 
+            qty = item.get("quantity", 1)
             order = Order(
                 order_id=f"ORD-{uuid.uuid4().hex[:8].upper()}",
                 user_id=user_id,
                 product_id=product.id,
-                product_details={"name": product.name, "image": product.image},
+                product_details={"name": product.name, "image": product.image, "unit": product.unit, "price": product.price, "discount": product.discount},
                 payment_status="CASH ON DELIVERY",
+                order_status="Confirmed",
+                quantity=qty,
+                invoice_number=invoice_num,
                 delivery_address=address_data,
                 sub_total_amt=sub_total_amt,
                 total_amt=total_amt,
@@ -63,7 +66,27 @@ def place_order():
             order_records.append(order)
 
             # Update stock
-            product.stock = max(0, product.stock - item.get("quantity", 1))
+            product.stock = max(0, product.stock - qty)
+
+        # Auto-save delivery address if not already saved
+        existing_addr = Address.query.filter_by(
+            user_id=user_id,
+            address_line=address_data.get("address_line", ""),
+            city=address_data.get("city", ""),
+            pincode=address_data.get("pincode", "")
+        ).first()
+        if not existing_addr:
+            new_addr = Address(
+                user_id=user_id,
+                address_line=address_data.get("address_line", ""),
+                city=address_data.get("city", ""),
+                state=address_data.get("state", ""),
+                pincode=address_data.get("pincode", ""),
+                country=address_data.get("country", "India"),
+                mobile=address_data.get("mobile", ""),
+                status=True,
+            )
+            db.session.add(new_addr)
 
         # Clear cart
         CartProduct.query.filter_by(user_id=user_id).delete()
@@ -91,6 +114,120 @@ def order_list():
             "success": True,
             "data": [o.to_dict() for o in orders],
         })
+    except Exception as e:
+        return jsonify({"message": str(e), "error": True, "success": False}), 500
+
+
+@order_bp.route("/cancel", methods=["PUT"])
+@auth_required
+def cancel_order():
+    """Cancel an order if it's still in Confirmed or Processing status."""
+    try:
+        data = request.get_json()
+        order_id = data.get("orderId")
+        
+        if not order_id:
+            return jsonify({"message": "Order ID is required", "error": True, "success": False}), 400
+        
+        order = Order.query.filter_by(id=order_id, user_id=request.user_id).first()
+        if not order:
+            return jsonify({"message": "Order not found", "error": True, "success": False}), 404
+        
+        cancellable = ["Confirmed", "Processing"]
+        if order.order_status not in cancellable:
+            return jsonify({"message": f"Cannot cancel order in '{order.order_status}' status", "error": True, "success": False}), 400
+        
+        order.order_status = "Cancelled"
+        
+        # Restore stock
+        product = Product.query.get(order.product_id)
+        if product:
+            product.stock += order.quantity
+        
+        db.session.commit()
+        return jsonify({"message": "Order cancelled successfully", "error": False, "success": True, "data": order.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": str(e), "error": True, "success": False}), 500
+
+
+@order_bp.route("/reorder", methods=["POST"])
+@auth_required
+def reorder():
+    """Add items from a previous order back to the cart."""
+    try:
+        data = request.get_json()
+        order_id = data.get("orderId")
+        
+        if not order_id:
+            return jsonify({"message": "Order ID is required", "error": True, "success": False}), 400
+        
+        order = Order.query.filter_by(id=order_id, user_id=request.user_id).first()
+        if not order:
+            return jsonify({"message": "Order not found", "error": True, "success": False}), 404
+        
+        product = Product.query.get(order.product_id)
+        if not product or product.stock <= 0:
+            return jsonify({"message": "Product is currently out of stock", "error": True, "success": False}), 400
+        
+        # Check if already in cart
+        existing = CartProduct.query.filter_by(user_id=request.user_id, product_id=order.product_id).first()
+        if existing:
+            existing.quantity += 1
+        else:
+            cart_item = CartProduct(user_id=request.user_id, product_id=order.product_id, quantity=1)
+            db.session.add(cart_item)
+        
+        db.session.commit()
+        return jsonify({"message": "Item added to cart", "error": False, "success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": str(e), "error": True, "success": False}), 500
+
+
+@order_bp.route("/track", methods=["POST"])
+@auth_required
+def track_order():
+    """Get tracking details for an order with timeline."""
+    try:
+        data = request.get_json()
+        order_id = data.get("orderId")
+        
+        if not order_id:
+            return jsonify({"message": "Order ID is required", "error": True, "success": False}), 400
+        
+        order = Order.query.filter_by(id=order_id, user_id=request.user_id).first()
+        if not order:
+            return jsonify({"message": "Order not found", "error": True, "success": False}), 404
+        
+        # Generate timeline based on status
+        from datetime import timedelta
+        statuses_flow = ["Confirmed", "Processing", "Packed", "Shipped", "Out for Delivery", "Delivered"]
+        
+        current_idx = -1
+        if order.order_status == "Cancelled":
+            timeline = [
+                {"status": "Confirmed", "time": order.created_at.isoformat(), "completed": True},
+                {"status": "Cancelled", "time": order.updated_at.isoformat(), "completed": True, "cancelled": True}
+            ]
+        else:
+            if order.order_status in statuses_flow:
+                current_idx = statuses_flow.index(order.order_status)
+            
+            timeline = []
+            for i, status in enumerate(statuses_flow):
+                entry = {"status": status, "completed": i <= current_idx}
+                if i <= current_idx:
+                    entry["time"] = (order.created_at + timedelta(hours=i * 2)).isoformat()
+                timeline.append(entry)
+        
+        tracking_data = {
+            "order": order.to_dict(),
+            "timeline": timeline,
+            "estimatedDelivery": (order.created_at + timedelta(hours=12)).isoformat(),
+        }
+        
+        return jsonify({"message": "Tracking details", "error": False, "success": True, "data": tracking_data})
     except Exception as e:
         return jsonify({"message": str(e), "error": True, "success": False}), 500
 
